@@ -27,6 +27,36 @@ def getinterfacenumber(thedevice):
            numbers = numbers + str(char)
     return(int(numbers))
 
+def getname(theline):
+    namepos=theline.find("name=\"")+6
+    thename=theline[namepos:]
+    index = thename.find('"')
+    thename = thename[:index]
+    return(thename)
+
+def lastveth(lastline):
+    theveth=getname(lastline)
+    thenumber=getinterfacenumber(theveth)
+    thenumber = thenumber + 1
+    thename="veth" + str(thenumber)
+    return(thename)
+
+def find_missing_veth(lines):
+    names=[]
+    for theline in lines[1:-1]:
+        thename = getname(theline)
+        if (thename != ""):
+           names.append(getname(theline))
+    nextname="veth1"
+    for thename in names:
+        if (thename != nextname):
+           return(nextname)
+        thenum = getinterfacenumber(thename)
+        thenum = thenum + 1
+        nextname = "veth" + str(thenum)
+    print(names)
+    return("")
+
 def findnextveth():
     #[admin@MikroTik] > /interface/veth/print
     #Flags: X - disabled; R - running 
@@ -37,14 +67,11 @@ def findnextveth():
     if (lastline.startswith("Flags")):
        theveth="veth1"
        return(theveth)
-    namepos=lastline.find("name=\"")+6
-    theveth=lastline[namepos:]
-    index = theveth.find('"')
-    theveth = theveth[:index]
-    thenumber=getinterfacenumber(theveth)
-    thenumber = thenumber + 1
-    thename="veth" + str(thenumber)
-    return(thename)
+    missingveth = find_missing_veth(lines)
+    if (missingveth==""):
+       thename = lastveth(lastline)
+       return(thename)
+    return(missingveth)
 
 def createveth(theveth):
     #/interface/veth/add name=veth1 address=192.168.88.2/24 gateway=192.168.88.1
