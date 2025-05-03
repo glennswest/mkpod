@@ -15,10 +15,17 @@ cbase="sata1/images/"
 def executecmd(hostname,cmd):
     try:
       result = Connection(hostname).run(cmd,hide=True)
-      msg = "Ran {0.command!r} on {0.connection.host}, got stdout:\n{0.stdout}"
+      msg = "{0.stdout}"
       return(msg.format(result))
     except:
       return("")
+
+def getinterfacenumber(thedevice):
+    numbers = ""
+    for char in thedevice:
+        if char.isdigit():
+           numbers = numbers + str(char)
+    return(int(numbers))
 
 def findnextveth():
     #[admin@MikroTik] > /interface/veth/print
@@ -26,8 +33,30 @@ def findnextveth():
     #0  R name="veth1" address=192.168.88.2/24 gateway=192.168.88.1 gateway6="" 
     result=executecmd("admin@" + default_host,"/interface/veth/print")
     lines = result.splitlines()
-    lastline = lines[-1]
-    print(lastline)
+    lastline = lines[-2]
+    if (lastline.startswith("Flags")):
+       theveth="veth1"
+       return(theveth)
+    namepos=lastline.find("name=\"")+6
+    theveth=lastline[namepos:]
+    index = theveth.find('"')
+    theveth = theveth[:index]
+    thenumber=getinterfacenumber(theveth)
+    thenumber = thenumber + 1
+    thename="veth" + str(thenumber)
+    return(thename)
+
+def createveth(theveth):
+    #/interface/veth/add name=veth1 address=192.168.88.2/24 gateway=192.168.88.1
+    #/interface/bridge/port add bridge=bridge interface=veth1
+    theinterfacenumber = int(getinterfacenumber(theveth))
+    theipnumber = theinterfacenumber + 1 
+    theip = "192.168.88." + str(theipnumber)
+    cmd = "/interface/veth/add name=" + theveth + " address=" + theip + "/24 gateway=192.168.88.1"
+    cmd == "/interface/bridge/port add bridge=bridge interface=theveth"
+    result=executecmd("admin@" + default_host,cmd)
+    print(cmd)
+    result=executecmd("admin@" + default_host,cmd)
 
 def getconfig(hostname):
     config=executecmd("admin@" + hostname,"/export show-sensitive\n")
@@ -74,4 +103,6 @@ def delete_pod(thename):
 
 interface = findnextveth()
 print(interface)
+
+createveth(interface)
 
