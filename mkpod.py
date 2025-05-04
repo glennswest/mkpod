@@ -55,7 +55,6 @@ def find_missing_veth(lines):
         thenum = getinterfacenumber(thename)
         thenum = thenum + 1
         nextname = "veth" + str(thenum)
-    print(names)
     return("")
 
 def findnextveth():
@@ -83,7 +82,6 @@ def createveth(theveth):
     cmd = "/interface/veth/add name=" + theveth + " address=" + theip + "/24 gateway=192.168.88.1"
     cmd == "/interface/bridge/port add bridge=bridge interface=theveth"
     result=executecmd("admin@" + default_host,cmd)
-    print(cmd)
     result=executecmd("admin@" + default_host,cmd)
 
 def getconfig(hostname):
@@ -94,7 +92,6 @@ def backup_config():
     theconfig = getconfig(default_host)
     now = datetime.datetime.now()
     unique_filename_datetime = now.strftime("configs/config_%Y%m%d_%H%M%S.txt")
-    print(unique_filename_datetime)
     with open(unique_filename_datetime,"w") as f:
          f.write(theconfig)
 
@@ -103,10 +100,10 @@ def set_direct_registry():
     return(result)
 
 def add_direct_pod(image,interface,rootdir,thename):
-    backup_config()
     cmd = "/container/add remote-image=" + image + " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
     result = executecmd("admin@" + default_host,cmd)
-    time.sleep(5)
+    # After download, it will go to stopped state
+    wait_container_state(thename,"stopped")
     cmd = "/container/start [find where name=\"" + thename + '"]'
     result = executecmd("admin@" + default_host,cmd)
     return(result)
@@ -116,20 +113,35 @@ def direct_pod(image,rootdir,thename):
     createveth(interface)
     add_direct_pod(image,interface,rootdir,thename)
 
+def wait_container_state(thename,thestate):
+    cstate = "none"
+    while(cstate != thestate):
+        cons = containers()
+        con = cons.get(thename)
+        if (con == None):
+           cstate = "missing"
+           return
+        else:
+            cstate = con["status"]
+
 def delete_pod(thename):
      # [admin@MikroTik] > /container/stop [find where name="registry.gw.lo"]
      # [admin@MikroTik] > /container/remove [find where name="registry.gw.lo"]    
+    cons = containers()
+    con = cons[thename]
+    interface = con["interface"]
     cmd = "/container/stop [find where name=\"" + thename + '"]'
     result = executecmd("admin@" + default_host,cmd)
-    time.sleep(5)
+    wait_container_state(thename,"stopped")
     cmd = "/container/remove [find where name=\"" + thename + '"]'
     result = executecmd("admin@" + default_host,cmd)
-    time.sleep(5)
+    wait_container_state(thename,"missing")
+    delete_interface(interface)
 
 def containers():
     #0 name="registry.gw.lo" repo="registry-1.docker.io/distribution/distribution:latest" os="linux" arch="arm64" interface=veth1 root-dir=sata1/images/registry mounts="" workdir="/" logging=yes start-on-boot=yes status=running 
 
-    cons = []
+    cons = {}
     cmd = "/container/print"
     result = executecmd("admin@" + default_host,cmd)
     full_line = ""
@@ -139,14 +151,20 @@ def containers():
            values = full_line.split()
            con = {}
            con["id"] = values[0]
-           cons.append(con)
            for idx in range(1,len(values)):
                thepair = values[idx].split("=")
-               con[thepair[0]] = thepair[1].strip('\"')
+               if (len(thepair) == 2):
+                  con[thepair[0]] = thepair[1].strip('\"')
+           cons[con["name"]] = con
            full_line = ""
     return(cons)
-def con_interface(thename):
-    cons = containers()
+
+def delete_interface(interface):
+    cmd = "/interface bridge remove [/interface find name=\"" + interface + '"]'
+    result = executecmd("admin@" + default_host,cmd)
+    return(result)
+
+    
 
 #result = set_direct_registry()
 #result = delete_pod("registry.gw.lo")
@@ -160,5 +178,9 @@ def con_interface(thename):
 #result =  direct_pod("shahr773/alpine-sshd-arm64:1.0","alpine.gw.lo", "alpine.gw.lo")
 
 
-containers()
+#cons = containers()
+#print(cons)
+
+result =  direct_pod("shahr773/alpine-sshd-arm64:1.0","alpine.gw.lo", "alpine.gw.lo")
+result = delete_pod("alpine.gw.lo")
 
