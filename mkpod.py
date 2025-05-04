@@ -2,6 +2,7 @@ from fabric import Connection
 from datetime import datetime
 import datetime
 import time
+import json
 
 # mgmt1
 
@@ -110,6 +111,11 @@ def add_direct_pod(image,interface,rootdir,thename):
     result = executecmd("admin@" + default_host,cmd)
     return(result)
 
+def direct_pod(image,rootdir,thename):
+    interface = findnextveth()
+    createveth(interface)
+    add_direct_pod(image,interface,rootdir,thename)
+
 def delete_pod(thename):
      # [admin@MikroTik] > /container/stop [find where name="registry.gw.lo"]
      # [admin@MikroTik] > /container/remove [find where name="registry.gw.lo"]    
@@ -120,6 +126,28 @@ def delete_pod(thename):
     result = executecmd("admin@" + default_host,cmd)
     time.sleep(5)
 
+def containers():
+    #0 name="registry.gw.lo" repo="registry-1.docker.io/distribution/distribution:latest" os="linux" arch="arm64" interface=veth1 root-dir=sata1/images/registry mounts="" workdir="/" logging=yes start-on-boot=yes status=running 
+
+    cons = []
+    cmd = "/container/print"
+    result = executecmd("admin@" + default_host,cmd)
+    full_line = ""
+    for theline in result.splitlines():
+        full_line = full_line + theline
+        if ("status=" in full_line):
+           values = full_line.split()
+           con = {}
+           con["id"] = values[0]
+           cons.append(con)
+           for idx in range(1,len(values)):
+               thepair = values[idx].split("=")
+               con[thepair[0]] = thepair[1].strip('\"')
+           full_line = ""
+    return(cons)
+def con_interface(thename):
+    cons = containers()
+
 #result = set_direct_registry()
 #result = delete_pod("registry.gw.lo")
 #result = add_direct_pod("distribution/distribution","veth1", "registry", "registry.gw.lo")
@@ -128,8 +156,9 @@ def delete_pod(thename):
 #result = delete_pod("alpine.gw.lo")
 #result = add_direct_pod("shahr773/alpine-sshd-arm64:1.0","veth1", "alpine.gw.lo", "alpine.gw.lo")
 
-interface = findnextveth()
-print(interface)
+#result = direct_pod("distribution/distribution","registry", "registry.gw.lo")
+#result =  direct_pod("shahr773/alpine-sshd-arm64:1.0","alpine.gw.lo", "alpine.gw.lo")
 
-createveth(interface)
+
+containers()
 
