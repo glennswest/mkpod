@@ -12,6 +12,7 @@ import json
 
 default_host="rose1.gw.lo"
 cbase="sata1/images/"
+mbase="sata1/volumes"
 
 def executecmd(hostname,cmd):
     try:
@@ -41,6 +42,20 @@ def lastveth(lastline):
     thenumber = thenumber + 1
     thename="veth" + str(thenumber)
     return(thename)
+
+def get_veths():
+    result=executecmd("admin@" + default_host,"/interface/veth/print")
+    lines = result.splitlines()
+    names=[]
+    for theline in lines[1:-1]:
+        thename = getname(theline)
+        if (thename != ""):
+           names.append(getname(theline))
+    return(names)
+def wait_for_veth_delete(thename):
+    the_veths = get_veths()
+    while(thename in the_veths):
+        the_veths = get_veths()
 
 def find_missing_veth(lines):
     names=[]
@@ -80,8 +95,8 @@ def createveth(theveth):
     theipnumber = theinterfacenumber + 1 
     theip = "192.168.88." + str(theipnumber)
     cmd = "/interface/veth/add name=" + theveth + " address=" + theip + "/24 gateway=192.168.88.1"
-    cmd == "/interface/bridge/port add bridge=bridge interface=theveth"
     result=executecmd("admin@" + default_host,cmd)
+    cmd = "/interface/bridge/port add bridge=bridge interface=" + theveth
     result=executecmd("admin@" + default_host,cmd)
 
 def getconfig(hostname):
@@ -99,8 +114,11 @@ def set_direct_registry():
     result = executecmd("admin@" + default_host,"/container/config/set registry-url=https://registry-1.docker.io tmpdir=sata1/tmp")
     return(result)
 
-def add_direct_pod(image,interface,rootdir,thename):
+def add_direct_pod(image,interface,rootdir,thename,mounts = []):
     cmd = "/container/add remote-image=" + image + " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
+    if (len(mounts) > 0):
+       themounts = ','.join(mounts)
+       cmd = cmd + " mounts=" + themounts
     result = executecmd("admin@" + default_host,cmd)
     # After download, it will go to stopped state
     wait_container_state(thename,"stopped")
@@ -108,10 +126,10 @@ def add_direct_pod(image,interface,rootdir,thename):
     result = executecmd("admin@" + default_host,cmd)
     return(result)
 
-def direct_pod(image,rootdir,thename):
+def direct_pod(image,rootdir,thename,mounts = []):
     interface = findnextveth()
     createveth(interface)
-    add_direct_pod(image,interface,rootdir,thename)
+    add_direct_pod(image,interface,rootdir,thename,mounts)
 
 def wait_container_state(thename,thestate):
     cstate = "none"
@@ -162,9 +180,16 @@ def containers():
 def delete_interface(interface):
     cmd = "/interface bridge remove [/interface find name=\"" + interface + '"]'
     result = executecmd("admin@" + default_host,cmd)
+    wait_for_veth_delete(interface)
     return(result)
 
     
+def add_mount(thecontainer,mount_name,src,dst):
+    comment = "\"{cname=\'" + thecontainer + "\'}\""
+    cmd = "/container/mount/add name=" + mount_name + " src=" + src + " dst=" + dst + " comment=" + comment
+    result = executecmd("admin@" + default_host,cmd)
+    return(result)
+
 
 #result = set_direct_registry()
 #result = delete_pod("registry.gw.lo")
@@ -181,6 +206,15 @@ def delete_interface(interface):
 #cons = containers()
 #print(cons)
 
-result =  direct_pod("shahr773/alpine-sshd-arm64:1.0","alpine.gw.lo", "alpine.gw.lo")
+#result =  direct_pod("shahr773/alpine-sshd-arm64:1.0","alpine.gw.lo", "alpine.gw.lo")
+#result = delete_pod("alpine.gw.lo")
+
+
 result = delete_pod("alpine.gw.lo")
+result =  add_mount("alpine.gw.lo","alpine.gw.lo.0",mbase + "/alpine.gw.lo.0", "/var/lib/data")
+result =  add_mount("alpine.gw.lo","alpine.gw.lo.1",mbase + "/alpine.gw.lo.1", "/root")
+result =  direct_pod("shahr773/alpine-sshd-arm64:1.0","alpine.gw.lo", "alpine.gw.lo",["alpine.gw.lo.0","alpine.gw.lo.1"])
+
+#veths = get_veths()
+#print(veths)
 
