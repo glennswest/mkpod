@@ -215,7 +215,7 @@ def rsync(thename,thepath):
 
 def use_container_tar(image_name):
     image_filename = image_name.replace(":",".") + ".tar"
-    result = subprocess.run(['podman','pull',image_name], check=True, capture_output=True, text=True, universal_newlines=True).stdout
+    result = subprocess.run(['podman','pull','--arch=arm64',image_name], check=True, capture_output=True, text=True, universal_newlines=True).stdout
     output = str(result)
     lines = output.strip('\n').split('\n')
     imageid = lines[-1]
