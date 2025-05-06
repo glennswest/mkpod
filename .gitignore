@@ -2,3 +2,5 @@
 venv/*
 configs/*
 mkpod.log
+dist/*
+.pypirc
