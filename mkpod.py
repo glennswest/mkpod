@@ -123,7 +123,6 @@ def set_direct_registry():
     return(result)
 
 def add_direct_pod(image,interface,rootdir,thename,mounts = [],podcmd="",podentrypoint=""):
-    print("Using interface " + interface)
     if (".tar" in image):
        thepath = tbase + "/" + image
        cmd = "/container/add file=" + thepath+ " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
@@ -136,10 +135,7 @@ def add_direct_pod(image,interface,rootdir,thename,mounts = [],podcmd="",podentr
     if (len(mounts) > 0):
        themounts = ','.join(mounts)
        cmd = cmd + " mounts=" + themounts
-    print(default_host)
-    print(cmd)
     result = executecmd("admin@" + default_host,cmd)
-    print("Adding add container" + result)
     # After download, it will go to stopped state
     wait_container_state(thename,"stopped")
     cmd = "/container/start [find where name=\"" + thename + '"]'
@@ -148,9 +144,7 @@ def add_direct_pod(image,interface,rootdir,thename,mounts = [],podcmd="",podentr
 
 def direct_pod(image,rootdir,thename,mounts = [],podcmd="",podentrypoint=""):
     interface = findnextveth()
-    print(interface)
     createveth(interface)
-    print("Created veth")
     add_direct_pod(image,interface,rootdir,thename,mounts,podcmd,podentrypoint)
 
 def wait_container_state(thename,thestate):
@@ -230,8 +224,6 @@ def use_container_tar(image_name):
     rsync(image_filename,thepath)
     os.remove(image_filename)
     return(image_filename)
-
-print("test")
 
 if __name__ == "__main__":
    print("Module mkpod - For use by other python programs")

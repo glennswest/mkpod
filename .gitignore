@@ -1,3 +1,4 @@
 .env
 venv
 configs/*
+mkpod.log
