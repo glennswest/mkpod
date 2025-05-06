@@ -21,3 +21,8 @@ license-files = ["LICEN[CS]E*"]
 Homepage = "https://https://github.com/glennswest/mkpod"
 Issues = "https://https://github.com/glennswest/mkpod/issues"
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+     ".pypirc"
+]
+
