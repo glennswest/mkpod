@@ -5,6 +5,7 @@ from datetime import datetime
 import datetime
 import time
 import json
+import subprocess
 
 # mgmt1
 
@@ -15,11 +16,15 @@ import json
 default_host="rose1.gw.lo"
 cbase="sata1/images/"
 mbase="sata1/volumes"
+tbase="sata1/tarballs"
 
 def executecmd(hostname,cmd):
     try:
       result = Connection(hostname).run(cmd,hide=True)
       msg = "{0.stdout}"
+      with open("mkpod.log", 'a+') as f:
+          print(cmd, file=f)
+          print("   " + msg.format(result),file=f)
       return(msg.format(result))
     except:
       return("")
@@ -117,11 +122,19 @@ def set_direct_registry():
     return(result)
 
 def add_direct_pod(image,interface,rootdir,thename,mounts = []):
-    cmd = "/container/add remote-image=" + image + " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
+    print("Using interface " + interface)
+    if (".tar" in image):
+       thepath = tbase + "/" + image
+       cmd = "/container/add file=" + thepath+ " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
+    else:
+       cmd = "/container/add remote-image=" + image + " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
     if (len(mounts) > 0):
        themounts = ','.join(mounts)
        cmd = cmd + " mounts=" + themounts
+    print(default_host)
+    print(cmd)
     result = executecmd("admin@" + default_host,cmd)
+    print("Adding add container" + result)
     # After download, it will go to stopped state
     wait_container_state(thename,"stopped")
     cmd = "/container/start [find where name=\"" + thename + '"]'
@@ -130,7 +143,9 @@ def add_direct_pod(image,interface,rootdir,thename,mounts = []):
 
 def direct_pod(image,rootdir,thename,mounts = []):
     interface = findnextveth()
+    print(interface)
     createveth(interface)
+    print("Created veth")
     add_direct_pod(image,interface,rootdir,thename,mounts)
 
 def wait_container_state(thename,thestate):
@@ -191,6 +206,22 @@ def add_mount(thecontainer,mount_name,src,dst):
     cmd = "/container/mount/add name=" + mount_name + " src=" + src + " dst=" + dst + " comment=" + comment
     result = executecmd("admin@" + default_host,cmd)
     return(result)
+
+def rsync(thename,thepath):
+    result = subprocess.run(['rsync','-av',thename,thepath], check=True, capture_output=True, text=True, universal_newlines=True).stdout
+
+def use_container_tar(image_name):
+    image_filename = image_name.replace(":",".") + ".tar"
+    result = subprocess.run(['podman','pull',image_name], check=True, capture_output=True, text=True, universal_newlines=True).stdout
+    output = str(result)
+    lines = output.strip('\n').split('\n')
+    imageid = lines[-1]
+    result = subprocess.run(['podman','save',imageid,'-o',image_filename], check=True, capture_output=True, text=True, universal_newlines=True).stdout
+    thepath = "admin@" + default_host + ":" + tbase + "/" + image_filename
+    rsync(image_filename,thepath)
+    os.remove(image_filename)
+    return(image_filename)
+
 
 if __name__ == "__main__":
    print("Module mkpod - For use by other python programs")
