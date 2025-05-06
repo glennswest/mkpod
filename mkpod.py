@@ -6,6 +6,7 @@ import datetime
 import time
 import json
 import subprocess
+import os
 
 # mgmt1
 
@@ -21,7 +22,7 @@ tbase="sata1/tarballs"
 def executecmd(hostname,cmd):
     try:
       result = Connection(hostname).run(cmd,hide=True)
-      msg = "{0.stdout}"
+      msg = "{0.stdout}" + "{0.stderr}"
       with open("mkpod.log", 'a+') as f:
           print(cmd, file=f)
           print("   " + msg.format(result),file=f)
@@ -121,13 +122,17 @@ def set_direct_registry():
     result = executecmd("admin@" + default_host,"/container/config/set registry-url=https://registry-1.docker.io tmpdir=sata1/tmp")
     return(result)
 
-def add_direct_pod(image,interface,rootdir,thename,mounts = []):
+def add_direct_pod(image,interface,rootdir,thename,mounts = [],podcmd="",podentrypoint=""):
     print("Using interface " + interface)
     if (".tar" in image):
        thepath = tbase + "/" + image
        cmd = "/container/add file=" + thepath+ " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
     else:
        cmd = "/container/add remote-image=" + image + " interface=" + interface + " root-dir=" + cbase +  rootdir + " name=" + thename + " start-on-boot=yes logging=yes"
+    if podcmd:
+       cmd = cmd + " cmd=\"" + podcmd + "\""
+    if podentrypoint:
+       cmd = cmd + " entrypoint=\"" + podentrypoint + "\""
     if (len(mounts) > 0):
        themounts = ','.join(mounts)
        cmd = cmd + " mounts=" + themounts
@@ -141,12 +146,12 @@ def add_direct_pod(image,interface,rootdir,thename,mounts = []):
     result = executecmd("admin@" + default_host,cmd)
     return(result)
 
-def direct_pod(image,rootdir,thename,mounts = []):
+def direct_pod(image,rootdir,thename,mounts = [],podcmd="",podentrypoint=""):
     interface = findnextveth()
     print(interface)
     createveth(interface)
     print("Created veth")
-    add_direct_pod(image,interface,rootdir,thename,mounts)
+    add_direct_pod(image,interface,rootdir,thename,mounts,podcmd,podentrypoint)
 
 def wait_container_state(thename,thestate):
     cstate = "none"
@@ -163,6 +168,8 @@ def delete_pod(thename):
      # [admin@MikroTik] > /container/stop [find where name="registry.gw.lo"]
      # [admin@MikroTik] > /container/remove [find where name="registry.gw.lo"]    
     cons = containers()
+    if (thename not in cons):
+       return
     con = cons[thename]
     interface = con["interface"]
     cmd = "/container/stop [find where name=\"" + thename + '"]'
@@ -201,9 +208,11 @@ def delete_interface(interface):
     return(result)
 
     
-def add_mount(thecontainer,mount_name,src,dst):
-    comment = "\"{cname=\'" + thecontainer + "\'}\""
-    cmd = "/container/mount/add name=" + mount_name + " src=" + src + " dst=" + dst + " comment=" + comment
+#def add_mount(thecontainer,mount_name,src,dst):
+def add_mount(mount_name,src,dst):
+    # comment = "\"{cname=\'" + thecontainer + "\'}\""
+    #cmd = "/container/mount/add name=" + mount_name + " src=" + src + " dst=" + dst + " comment=" + comment
+    cmd = "/container/mount/add name=" + mount_name + " src=" + src + " dst=" + dst
     result = executecmd("admin@" + default_host,cmd)
     return(result)
 
@@ -222,6 +231,7 @@ def use_container_tar(image_name):
     os.remove(image_filename)
     return(image_filename)
 
+print("test")
 
 if __name__ == "__main__":
    print("Module mkpod - For use by other python programs")
