@@ -3,7 +3,7 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 [project]
 name = "mkpod"
-version = "1.0.0"
+version = "1.0.14"
 authors = [
   { name="glenn west", email="glennswest@neuralcloudcomputing.com" },
 ]
