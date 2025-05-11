@@ -215,12 +215,18 @@ def rsync(thename,thepath):
 
 def use_container_tar(image_name):
     image_filename = image_name.replace(":",".") + ".tar"
+    image_filename = os.path.basename(image_filename)
+    print(image_filename)
+    print("Pulling")
     result = subprocess.run(['podman','pull','--arch=arm64',image_name], check=True, capture_output=True, text=True, universal_newlines=True).stdout
     output = str(result)
     lines = output.strip('\n').split('\n')
     imageid = lines[-1]
+    print(imageid)
+    print("saving")
     result = subprocess.run(['podman','save',imageid,'-o',image_filename], check=True, capture_output=True, text=True, universal_newlines=True).stdout
     thepath = "admin@" + default_host + ":" + tbase + "/" + image_filename
+    print("uploading")
     rsync(image_filename,thepath)
     os.remove(image_filename)
     return(image_filename)
